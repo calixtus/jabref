@@ -181,7 +181,7 @@ dependencies {
     implementation "org.tinylog:slf4j-tinylog:2.4.1"
     implementation "org.tinylog:tinylog-impl:2.4.1"
 
-    implementation 'de.undercouch:citeproc-java:3.0.0-alpha.3'
+    implementation 'de.undercouch:citeproc-java:3.0.0-SNAPSHOT'
 
     implementation group: 'jakarta.activation', name: 'jakarta.activation-api', version: '1.2.1'
     implementation group: 'jakarta.xml.bind', name: 'jakarta.xml.bind-api', version: '2.3.2'
