@@ -210,7 +210,7 @@ dependencies {
         exclude module: "jsr305"
     }
 
-    implementation 'jakarta.annotation:jakarta.annotation-api:2.1.1'
+    implementation 'jakarta.annotation:jakarta.annotation-api:3.0.0'
     implementation 'jakarta.inject:jakarta.inject-api:2.0.1'
 
     implementation('org.jabref:afterburner.fx:2.0.0') {
