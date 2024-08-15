@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.MalformedURLException;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -31,6 +30,7 @@ import org.jabref.logic.search.SearchQuery;
 import org.jabref.logic.util.WebViewStore;
 import org.jabref.model.database.BibDatabaseContext;
 import org.jabref.model.entry.BibEntry;
+import org.jabref.preferences.FilePreferences;
 import org.jabref.preferences.PreferencesService;
 
 import com.airhacks.afterburner.injection.Injector;
@@ -122,38 +122,39 @@ public class PreviewViewer extends ScrollPane implements InvalidationListener {
 
     private final ClipBoardManager clipBoardManager;
     private final DialogService dialogService;
-    private final PreferencesService preferencesService;
 
     private final TaskExecutor taskExecutor;
     private final WebView previewView;
-    private PreviewLayout layout;
 
-    /**
-     * The entry currently shown
-     */
-    private Optional<BibEntry> entry = Optional.empty();
-    private Optional<Pattern> searchHighlightPattern = Optional.empty();
+    private BibDatabaseContext currentDatabase;
+    private BibEntry currentEntry;
+    private PreviewLayout currentLayout;
+    private Pattern searchHighlightPattern;
 
-    private final BibDatabaseContext database;
     private boolean registered;
 
     private final ChangeListener<Optional<SearchQuery>> listener = (queryObservable, queryOldValue, queryNewValue) -> {
-        searchHighlightPattern = queryNewValue.flatMap(SearchQuery::getJavaScriptPatternForWords);
+        searchHighlightPattern = queryNewValue.flatMap(SearchQuery::getJavaScriptPatternForWords)
+                                              .orElseGet(() -> Pattern.compile(".*"));
         highlightSearchPattern();
     };
 
-    /**
-     * @param database Used for resolving strings and pdf directories for links.
-     */
-    public PreviewViewer(BibDatabaseContext database,
+    public PreviewViewer(BibDatabaseContext databaseContext,
                          DialogService dialogService,
                          PreferencesService preferencesService,
                          StateManager stateManager,
                          ThemeManager themeManager,
                          TaskExecutor taskExecutor) {
-        this.database = Objects.requireNonNull(database);
+        this(dialogService, preferencesService.getFilePreferences(), stateManager, themeManager, taskExecutor);
+        setDatabase(databaseContext);
+    }
+
+    public PreviewViewer(DialogService dialogService,
+                         FilePreferences filePreferences,
+                         StateManager stateManager,
+                         ThemeManager themeManager,
+                         TaskExecutor taskExecutor) {
         this.dialogService = dialogService;
-        this.preferencesService = preferencesService;
         this.clipBoardManager = Injector.instantiateModelOrService(ClipBoardManager.class);
         this.taskExecutor = taskExecutor;
 
@@ -186,7 +187,7 @@ public class PreviewViewer extends ScrollPane implements InvalidationListener {
                     String href = anchorElement.getHref();
                     if (href != null) {
                         try {
-                            JabRefDesktop.openBrowser(href, preferencesService.getFilePreferences());
+                            JabRefDesktop.openBrowser(href, filePreferences);
                         } catch (MalformedURLException exception) {
                             LOGGER.error("Invalid URL", exception);
                         } catch (IOException exception) {
@@ -203,8 +204,8 @@ public class PreviewViewer extends ScrollPane implements InvalidationListener {
 
     private void highlightSearchPattern() {
         String callbackForUnmark = "";
-        if (searchHighlightPattern.isPresent()) {
-            String javaScriptRegex = createJavaScriptRegex(searchHighlightPattern.get());
+        if (searchHighlightPattern != null) {
+            String javaScriptRegex = createJavaScriptRegex(searchHighlightPattern);
             callbackForUnmark = JS_MARK_REG_EXP_CALLBACK.formatted(javaScriptRegex);
         }
         String unmarkInstance = JS_UNMARK_WITH_CALLBACK.formatted(callbackForUnmark);
@@ -230,19 +231,27 @@ public class PreviewViewer extends ScrollPane implements InvalidationListener {
         if (newLayout == null) {
             return;
         }
-        layout = newLayout;
+        currentLayout = newLayout;
+        update();
+    }
+
+    public void setDatabase(BibDatabaseContext newDatabase) {
+        if (newDatabase == null) {
+            return;
+        }
+        currentDatabase = newDatabase;
         update();
     }
 
     public void setEntry(BibEntry newEntry) {
         // Remove update listener for old entry
-        entry.ifPresent(oldEntry -> {
-            for (Observable observable : oldEntry.getObservables()) {
+        if (currentEntry != null) {
+            for (Observable observable : currentEntry.getObservables()) {
                 observable.removeListener(this);
             }
-        });
+        }
 
-        entry = Optional.of(newEntry);
+        currentEntry = newEntry;
 
         // Register for changes
         for (Observable observable : newEntry.getObservables()) {
@@ -252,7 +261,7 @@ public class PreviewViewer extends ScrollPane implements InvalidationListener {
     }
 
     private void update() {
-        if (entry.isEmpty() || (layout == null)) {
+        if (currentEntry == null || currentLayout == null || currentDatabase == null) {
             // Make sure that the preview panel is not completely white, especially with dark theme on
             setPreviewText("");
             return;
@@ -260,10 +269,10 @@ public class PreviewViewer extends ScrollPane implements InvalidationListener {
 
         Number.serialExportNumber = 1; // Set entry number in case that is included in the preview layout.
 
-        final BibEntry theEntry = entry.get();
+        final BibEntry theEntry = currentEntry;
         BackgroundTask
-                .wrap(() -> layout.generatePreview(theEntry, database))
-                .onRunning(() -> setPreviewText("<i>" + Localization.lang("Processing %0", Localization.lang("Citation Style")) + ": " + layout.getDisplayName() + " ..." + "</i>"))
+                .wrap(() -> currentLayout.generatePreview(theEntry, currentDatabase))
+                .onRunning(() -> setPreviewText("<i>" + Localization.lang("Processing %0", Localization.lang("Citation Style")) + ": " + currentLayout.getDisplayName() + " ..." + "</i>"))
                 .onSuccess(this::setPreviewText)
                 .onFailure(exception -> {
                     LOGGER.error("Error while generating citation style", exception);
@@ -304,7 +313,7 @@ public class PreviewViewer extends ScrollPane implements InvalidationListener {
 
         BackgroundTask
                 .wrap(() -> {
-                    job.getJobSettings().setJobName(entry.flatMap(BibEntry::getCitationKey).orElse("NO ENTRY"));
+                    job.getJobSettings().setJobName(Optional.of(currentEntry).flatMap(BibEntry::getCitationKey).orElse("NO ENTRY"));
                     previewView.getEngine().print(job);
                     job.endJob();
                 })

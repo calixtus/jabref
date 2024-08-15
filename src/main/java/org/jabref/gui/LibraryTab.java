@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import javax.swing.undo.UndoManager;
@@ -20,13 +19,11 @@ import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.value.ObservableBooleanValue;
 import javafx.collections.ListChangeListener;
 import javafx.event.Event;
-import javafx.geometry.Orientation;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ProgressIndicator;
-import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.Tooltip;
@@ -42,7 +39,6 @@ import org.jabref.gui.autosaveandbackup.AutosaveManager;
 import org.jabref.gui.autosaveandbackup.BackupManager;
 import org.jabref.gui.collab.DatabaseChangeMonitor;
 import org.jabref.gui.dialogs.AutosaveUiManager;
-import org.jabref.gui.entryeditor.EntryEditor;
 import org.jabref.gui.exporter.SaveDatabaseAction;
 import org.jabref.gui.fieldeditors.LinkedFileViewModel;
 import org.jabref.gui.importer.actions.OpenDatabaseAction;
@@ -52,8 +48,6 @@ import org.jabref.gui.maintable.MainTable;
 import org.jabref.gui.maintable.MainTableDataModel;
 import org.jabref.gui.undo.CountingUndoManager;
 import org.jabref.gui.undo.NamedCompound;
-import org.jabref.gui.undo.RedoAction;
-import org.jabref.gui.undo.UndoAction;
 import org.jabref.gui.undo.UndoableFieldChange;
 import org.jabref.gui.undo.UndoableInsertEntries;
 import org.jabref.gui.undo.UndoableRemoveEntries;
@@ -96,7 +90,6 @@ import org.jabref.preferences.PreferencesService;
 import com.airhacks.afterburner.injection.Injector;
 import com.google.common.eventbus.Subscribe;
 import com.tobiasdiez.easybind.EasyBind;
-import com.tobiasdiez.easybind.Subscription;
 import org.controlsfx.control.NotificationPane;
 import org.controlsfx.control.action.Action;
 import org.slf4j.Logger;
@@ -109,7 +102,6 @@ public class LibraryTab extends Tab {
     /**
      * Defines the different modes that the tab can operate in
      */
-    private enum PanelMode { MAIN_TABLE, MAIN_TABLE_AND_ENTRY_EDITOR }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LibraryTab.class);
     private final LibraryTabContainer tabContainer;
@@ -126,10 +118,7 @@ public class LibraryTab extends Tab {
     private MainTableDataModel tableModel;
     private CitationStyleCache citationStyleCache;
     private FileAnnotationCache annotationCache;
-    private EntryEditor entryEditor;
     private MainTable mainTable;
-    private PanelMode mode = PanelMode.MAIN_TABLE;
-    private SplitPane splitPane;
     private DatabaseNotification databaseNotificationPane;
 
     // Indicates whether the tab is loading data using a dataloading task
@@ -145,9 +134,6 @@ public class LibraryTab extends Tab {
     private BibEntry showing;
 
     private SuggestionProviders suggestionProviders;
-
-    @SuppressWarnings({"FieldCanBeLocal"})
-    private Subscription dividerPositionSubscription;
 
     // the query the user searches when this BasePanel is active
     private Optional<SearchQuery> currentSearchQuery = Optional.empty();
@@ -205,8 +191,6 @@ public class LibraryTab extends Tab {
 
         this.getDatabase().registerListener(new UpdateTimestampListener(preferencesService));
 
-        this.entryEditor = createEntryEditor();
-
         // set LibraryTab ID for drag'n'drop
         // ID content doesn't matter, we only need different tabs to have different ID
         this.setId(Long.valueOf(new Random().nextLong()).toString());
@@ -219,14 +203,6 @@ public class LibraryTab extends Tab {
 
         setOnCloseRequest(this::onCloseRequest);
         setOnClosed(this::onClosed);
-    }
-
-    private EntryEditor createEntryEditor() {
-        Supplier<LibraryTab> tabSupplier = () -> this;
-        return new EntryEditor(this,
-                // Actions are recreated here since this avoids passing more parameters and the amount of additional memory consumption is neglegtable.
-                new UndoAction(tabSupplier, dialogService, stateManager),
-                new RedoAction(tabSupplier, dialogService, stateManager));
     }
 
     private static void addChangedInformation(StringBuilder text, String fileName) {
@@ -334,8 +310,6 @@ public class LibraryTab extends Tab {
         this.bibDatabaseContext.getDatabase().registerListener(this);
 
         this.getDatabase().registerListener(new UpdateTimestampListener(preferencesService));
-
-        this.entryEditor = createEntryEditor();
 
         Platform.runLater(() -> {
             EasyBind.subscribe(changedProperty, this::updateTabTitle);
@@ -490,7 +464,7 @@ public class LibraryTab extends Tab {
             }
         }
 
-        ensureNotShowingBottomPanel(entries);
+        stateManager.setSelectedEntries(List.of());
 
         this.changedProperty.setValue(true);
         switch (mode) {
@@ -551,8 +525,8 @@ public class LibraryTab extends Tab {
         });
     }
 
-    private void createMainTable() {
-        mainTable = new MainTable(tableModel,
+    private MainTable createMainTable() {
+        MainTable table = new MainTable(tableModel,
                 this,
                 tabContainer,
                 bibDatabaseContext,
@@ -566,7 +540,7 @@ public class LibraryTab extends Tab {
                 fileUpdateMonitor);
         // Add the listener that binds selection to state manager (TODO: should be replaced by proper JavaFX binding as soon as table is implemented in JavaFX)
         // content binding between StateManager#getselectedEntries and mainTable#getSelectedEntries does not work here as it does not trigger the ActionHelper#needsEntriesSelected checker for the menubar
-        mainTable.addSelectionListener(event -> {
+        table.addSelectionListener(event -> {
             List<BibEntry> entries = event.getList().stream().map(BibEntryTableViewModel::getEntry).toList();
             stateManager.setSelectedEntries(entries);
             if (!entries.isEmpty()) {
@@ -577,20 +551,9 @@ public class LibraryTab extends Tab {
     }
 
     public void setupMainPanel() {
-        splitPane = new SplitPane();
-        splitPane.setOrientation(Orientation.VERTICAL);
-
-        createMainTable();
-
-        splitPane.getItems().add(mainTable);
-        databaseNotificationPane = new DatabaseNotification(splitPane);
+        mainTable = createMainTable();
+        databaseNotificationPane = new DatabaseNotification(mainTable);
         setContent(databaseNotificationPane);
-
-        // Saves the divider position as soon as it changes
-        // We need to keep a reference to the subscription, otherwise the binding gets garbage collected
-        dividerPositionSubscription = EasyBind.valueAt(splitPane.getDividers(), 0)
-                                              .mapObservable(SplitPane.Divider::positionProperty)
-                                              .subscribeToValues(this::saveDividerLocation);
 
         // Add changePane in case a file is present - otherwise just add the splitPane to the panel
         Optional<Path> file = bibDatabaseContext.getDatabasePath();
@@ -627,38 +590,6 @@ public class LibraryTab extends Tab {
         return searchAutoCompleter;
     }
 
-    public EntryEditor getEntryEditor() {
-        return entryEditor;
-    }
-
-    /**
-     * Sets the entry editor as the bottom component in the split pane. If an entry editor already was shown, makes sure that the divider doesn't move. Updates the mode to SHOWING_EDITOR. Then shows the given entry.
-     *
-     * @param entry The entry to edit.
-     */
-    public void showAndEdit(BibEntry entry) {
-        if (!splitPane.getItems().contains(entryEditor)) {
-            splitPane.getItems().addLast(entryEditor);
-            mode = PanelMode.MAIN_TABLE_AND_ENTRY_EDITOR;
-            splitPane.setDividerPositions(preferencesService.getEntryEditorPreferences().getDividerPosition());
-        }
-
-        // We use != instead of equals because of performance reasons
-        if (entry != showing) {
-            entryEditor.setCurrentlyEditedEntry(entry);
-            showing = entry;
-        }
-        entryEditor.requestFocus();
-    }
-
-    /**
-     * Removes the bottom component.
-     */
-    public void closeBottomPane() {
-        mode = PanelMode.MAIN_TABLE;
-        splitPane.getItems().remove(entryEditor);
-    }
-
     /**
      * This method selects the given entry, and scrolls it into view in the table. If an entryEditor is shown, it is given focus afterwards.
      */
@@ -674,30 +605,8 @@ public class LibraryTab extends Tab {
         mainTable.getSelectionModel().clearAndSelect(mainTable.getSelectionModel().getSelectedIndex() + 1);
     }
 
-    /**
-     * This method is called from an EntryEditor when it should be closed. We relay to the selection listener, which takes care of the rest.
-     */
-    public void entryEditorClosing() {
-        closeBottomPane();
+    public void requestFocus() {
         mainTable.requestFocus();
-    }
-
-    /**
-     * Closes the entry editor if it is showing any of the given entries.
-     */
-    private void ensureNotShowingBottomPanel(List<BibEntry> entriesToCheck) {
-        // This method is not able to close the bottom pane currently
-
-        if ((mode == PanelMode.MAIN_TABLE_AND_ENTRY_EDITOR) && (entriesToCheck.contains(entryEditor.getCurrentlyEditedEntry()))) {
-            closeBottomPane();
-        }
-    }
-
-    public void updateEntryEditorIfShowing() {
-        if (mode == PanelMode.MAIN_TABLE_AND_ENTRY_EDITOR) {
-            BibEntry currentEntry = entryEditor.getCurrentlyEditedEntry();
-            showAndEdit(currentEntry);
-        }
     }
 
     /**
@@ -745,15 +654,6 @@ public class LibraryTab extends Tab {
                     optOut -> preferencesService.getWorkspacePreferences().setConfirmDelete(!optOut));
         } else {
             return true;
-        }
-    }
-
-    /**
-     * Depending on whether a preview or an entry editor is showing, save the current divider location in the correct preference setting.
-     */
-    private void saveDividerLocation(Number position) {
-        if (mode == PanelMode.MAIN_TABLE_AND_ENTRY_EDITOR) {
-            preferencesService.getEntryEditorPreferences().setDividerPosition(position.doubleValue());
         }
     }
 

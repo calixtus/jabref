@@ -5,6 +5,7 @@ import java.util.List;
 
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.DoubleBinding;
+import javafx.beans.binding.ObjectExpression;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Hyperlink;
@@ -19,6 +20,7 @@ import javafx.scene.text.FontPosture;
 import javafx.scene.text.Text;
 
 import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTab;
 import org.jabref.gui.desktop.JabRefDesktop;
 import org.jabref.gui.util.BackgroundTask;
 import org.jabref.gui.util.TaskExecutor;
@@ -26,7 +28,7 @@ import org.jabref.logic.importer.ImportCleanup;
 import org.jabref.logic.importer.fetcher.MrDLibFetcher;
 import org.jabref.logic.l10n.Localization;
 import org.jabref.logic.util.BuildInfo;
-import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.database.BibDatabaseMode;
 import org.jabref.model.entry.BibEntry;
 import org.jabref.model.entry.field.StandardField;
 import org.jabref.preferences.MrDlibPreferences;
@@ -47,16 +49,14 @@ public class RelatedArticlesTab extends EntryEditorTab {
     private final BuildInfo buildInfo;
     private final TaskExecutor taskExecutor;
 
-    private final BibDatabaseContext databaseContext;
-
     private final PreferencesService preferencesService;
 
     public RelatedArticlesTab(BuildInfo buildInfo,
-                              BibDatabaseContext databaseContext,
+                              ObjectExpression<LibraryTab> currentLibrary,
                               PreferencesService preferencesService,
                               DialogService dialogService,
                               TaskExecutor taskExecutor) {
-        this.databaseContext = databaseContext;
+        this.currentLibrary = currentLibrary;
 
         this.dialogService = dialogService;
         this.buildInfo = buildInfo;
@@ -88,7 +88,8 @@ public class RelatedArticlesTab extends EntryEditorTab {
                 .wrap(() -> fetcher.performSearch(entry))
                 .onRunning(() -> progress.setVisible(true))
                 .onSuccess(relatedArticles -> {
-                    ImportCleanup cleanup = ImportCleanup.targeting(databaseContext.getMode(), preferencesService.getFieldPreferences());
+                    BibDatabaseMode mode = getCurrentBibDatabaseMode();
+                    ImportCleanup cleanup = ImportCleanup.targeting(mode, preferencesService.getFieldPreferences());
                     cleanup.doPostCleanup(relatedArticles);
                     progress.setVisible(false);
                     root.getChildren().add(getRelatedArticleInfo(relatedArticles, fetcher));

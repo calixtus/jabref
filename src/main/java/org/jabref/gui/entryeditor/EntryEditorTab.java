@@ -1,11 +1,17 @@
 package org.jabref.gui.entryeditor;
 
+import javafx.beans.binding.ObjectExpression;
 import javafx.scene.control.Tab;
 
+import org.jabref.gui.LibraryTab;
+import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.database.BibDatabaseMode;
 import org.jabref.model.entry.BibEntry;
 import org.jabref.model.entry.types.EntryType;
 
 public abstract class EntryEditorTab extends Tab {
+
+    protected ObjectExpression<LibraryTab> currentLibrary;
 
     protected BibEntry currentEntry;
 
@@ -42,5 +48,11 @@ public abstract class EntryEditorTab extends Tab {
             bindToEntry(entry);
         }
         handleFocus();
+    }
+
+    protected BibDatabaseMode getCurrentBibDatabaseMode() {
+        return currentLibrary.map(LibraryTab::getBibDatabaseContext)
+                             .orElse(new BibDatabaseContext()).getValue()
+                             .getMode();
     }
 }

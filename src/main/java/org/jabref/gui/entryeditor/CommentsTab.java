@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 
 import javax.swing.undo.UndoManager;
 
+import javafx.beans.binding.ObjectExpression;
 import javafx.collections.ObservableList;
 import javafx.geometry.VPos;
 import javafx.scene.control.Button;
@@ -17,19 +18,16 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.RowConstraints;
 
 import org.jabref.gui.DialogService;
-import org.jabref.gui.StateManager;
-import org.jabref.gui.autocompleter.SuggestionProviders;
+import org.jabref.gui.LibraryTab;
 import org.jabref.gui.fieldeditors.FieldEditorFX;
 import org.jabref.gui.fieldeditors.FieldNameLabel;
 import org.jabref.gui.icon.IconTheme;
-import org.jabref.gui.theme.ThemeManager;
+import org.jabref.gui.preview.PreviewPanel;
 import org.jabref.gui.undo.RedoAction;
 import org.jabref.gui.undo.UndoAction;
 import org.jabref.gui.util.TaskExecutor;
 import org.jabref.logic.journals.JournalAbbreviationRepository;
 import org.jabref.logic.l10n.Localization;
-import org.jabref.logic.pdf.search.IndexingTaskManager;
-import org.jabref.model.database.BibDatabaseContext;
 import org.jabref.model.entry.BibEntry;
 import org.jabref.model.entry.field.Field;
 import org.jabref.model.entry.field.StandardField;
@@ -44,32 +42,25 @@ public class CommentsTab extends FieldsEditorTab {
 
     private final EntryEditorPreferences entryEditorPreferences;
 
-    public CommentsTab(PreferencesService preferences,
-                       BibDatabaseContext databaseContext,
-                       SuggestionProviders suggestionProviders,
+    public CommentsTab(PreviewPanel previewPanel,
+                       PreferencesService preferences,
+                       ObjectExpression<LibraryTab> currentLibrary,
                        UndoManager undoManager,
                        UndoAction undoAction,
                        RedoAction redoAction,
                        DialogService dialogService,
-                       StateManager stateManager,
-                       ThemeManager themeManager,
-                       IndexingTaskManager indexingTaskManager,
                        TaskExecutor taskExecutor,
                        JournalAbbreviationRepository journalAbbreviationRepository) {
-        super(
-                false,
-                databaseContext,
-                suggestionProviders,
+        super(false,
+                previewPanel,
+                currentLibrary,
                 undoManager,
                 undoAction,
                 redoAction,
                 dialogService,
                 preferences,
-                stateManager,
-                themeManager,
                 taskExecutor,
-                journalAbbreviationRepository,
-                indexingTaskManager
+                journalAbbreviationRepository
         );
         this.defaultOwner = preferences.getOwnerPreferences().getDefaultOwner().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "-");
         setText(Localization.lang("Comments"));

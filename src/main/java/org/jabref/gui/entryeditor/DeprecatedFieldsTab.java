@@ -7,20 +7,18 @@ import java.util.stream.Collectors;
 
 import javax.swing.undo.UndoManager;
 
+import javafx.beans.binding.ObjectExpression;
 import javafx.scene.control.Tooltip;
 
 import org.jabref.gui.DialogService;
-import org.jabref.gui.StateManager;
-import org.jabref.gui.autocompleter.SuggestionProviders;
+import org.jabref.gui.LibraryTab;
 import org.jabref.gui.icon.IconTheme;
-import org.jabref.gui.theme.ThemeManager;
+import org.jabref.gui.preview.PreviewPanel;
 import org.jabref.gui.undo.RedoAction;
 import org.jabref.gui.undo.UndoAction;
 import org.jabref.gui.util.TaskExecutor;
 import org.jabref.logic.journals.JournalAbbreviationRepository;
 import org.jabref.logic.l10n.Localization;
-import org.jabref.logic.pdf.search.IndexingTaskManager;
-import org.jabref.model.database.BibDatabaseContext;
 import org.jabref.model.database.BibDatabaseMode;
 import org.jabref.model.entry.BibEntry;
 import org.jabref.model.entry.BibEntryType;
@@ -35,20 +33,17 @@ public class DeprecatedFieldsTab extends FieldsEditorTab {
     public static final String NAME = "Deprecated fields";
     private final BibEntryTypesManager entryTypesManager;
 
-    public DeprecatedFieldsTab(BibDatabaseContext databaseContext,
-                               SuggestionProviders suggestionProviders,
+    public DeprecatedFieldsTab(PreviewPanel previewPanel,
+                               ObjectExpression<LibraryTab> currentLibrary,
                                UndoManager undoManager,
                                UndoAction undoAction,
                                RedoAction redoAction,
                                DialogService dialogService,
                                PreferencesService preferences,
-                               StateManager stateManager,
-                               ThemeManager themeManager,
-                               IndexingTaskManager indexingTaskManager,
                                BibEntryTypesManager entryTypesManager,
                                TaskExecutor taskExecutor,
                                JournalAbbreviationRepository journalAbbreviationRepository) {
-        super(false, databaseContext, suggestionProviders, undoManager, undoAction, redoAction, dialogService, preferences, stateManager, themeManager, taskExecutor, journalAbbreviationRepository, indexingTaskManager);
+        super(false, previewPanel, currentLibrary, undoManager, undoAction, redoAction, dialogService, preferences, taskExecutor, journalAbbreviationRepository);
         this.entryTypesManager = entryTypesManager;
 
         setText(Localization.lang("Deprecated fields"));
@@ -64,13 +59,12 @@ public class DeprecatedFieldsTab extends FieldsEditorTab {
 
     @Override
     protected SequencedSet<Field> determineFieldsToShow(BibEntry entry) {
-        BibDatabaseMode mode = databaseContext.getMode();
+        BibDatabaseMode mode = getCurrentBibDatabaseMode();
         Optional<BibEntryType> entryType = entryTypesManager.enrich(entry.getType(), mode);
-        if (entryType.isPresent()) {
-            return entryType.get().getDeprecatedFields(mode).stream().filter(field -> !entry.getField(field).isEmpty()).collect(Collectors.toCollection(LinkedHashSet::new));
-        } else {
-            // Entry type unknown -> treat all fields as required (thus no optional fields)
-            return new LinkedHashSet<>();
-        }
+
+        return entryType.<SequencedSet<Field>>map(bibEntryType -> bibEntryType.getDeprecatedFields(mode).stream()
+                                                                              .filter(field -> !entry.getField(field).isEmpty())
+                                                                              .collect(Collectors.toCollection(LinkedHashSet::new)))
+                        .orElseGet(LinkedHashSet::new); // Entry type unknown -> treat all fields as required (thus no optional fields)
     }
 }

@@ -6,20 +6,19 @@ import java.util.SequencedSet;
 
 import javax.swing.undo.UndoManager;
 
+import javafx.beans.binding.ObjectExpression;
 import javafx.scene.control.Tooltip;
 
 import org.jabref.gui.DialogService;
-import org.jabref.gui.StateManager;
-import org.jabref.gui.autocompleter.SuggestionProviders;
+import org.jabref.gui.LibraryTab;
 import org.jabref.gui.icon.IconTheme;
-import org.jabref.gui.theme.ThemeManager;
+import org.jabref.gui.preview.PreviewPanel;
 import org.jabref.gui.undo.RedoAction;
 import org.jabref.gui.undo.UndoAction;
 import org.jabref.gui.util.TaskExecutor;
 import org.jabref.logic.journals.JournalAbbreviationRepository;
 import org.jabref.logic.l10n.Localization;
-import org.jabref.logic.pdf.search.IndexingTaskManager;
-import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.database.BibDatabaseMode;
 import org.jabref.model.entry.BibEntry;
 import org.jabref.model.entry.BibEntryType;
 import org.jabref.model.entry.BibEntryTypesManager;
@@ -33,21 +32,26 @@ public class RequiredFieldsTab extends FieldsEditorTab {
     public static final String NAME = "Required fields";
     private final BibEntryTypesManager entryTypesManager;
 
-    public RequiredFieldsTab(BibDatabaseContext databaseContext,
-                             SuggestionProviders suggestionProviders,
+    public RequiredFieldsTab(PreviewPanel previewPanel,
+                             ObjectExpression<LibraryTab> currentLibrary,
                              UndoManager undoManager,
                              UndoAction undoAction,
                              RedoAction redoAction,
                              DialogService dialogService,
                              PreferencesService preferences,
-                             StateManager stateManager,
-                             ThemeManager themeManager,
-                             IndexingTaskManager indexingTaskManager,
                              BibEntryTypesManager entryTypesManager,
                              TaskExecutor taskExecutor,
                              JournalAbbreviationRepository journalAbbreviationRepository) {
-        super(false, databaseContext, suggestionProviders, undoManager, undoAction, redoAction, dialogService,
-                preferences, stateManager, themeManager, taskExecutor, journalAbbreviationRepository, indexingTaskManager);
+        super(false,
+                previewPanel,
+                currentLibrary,
+                undoManager,
+                undoAction,
+                redoAction,
+                dialogService,
+                preferences,
+                taskExecutor,
+                journalAbbreviationRepository);
         this.entryTypesManager = entryTypesManager;
         setText(Localization.lang("Required fields"));
         setTooltip(new Tooltip(Localization.lang("Show required fields")));
@@ -56,7 +60,8 @@ public class RequiredFieldsTab extends FieldsEditorTab {
 
     @Override
     protected SequencedSet<Field> determineFieldsToShow(BibEntry entry) {
-        Optional<BibEntryType> entryType = entryTypesManager.enrich(entry.getType(), databaseContext.getMode());
+        BibDatabaseMode mode = currentLibrary.get().getBibDatabaseContext().getMode();
+        Optional<BibEntryType> entryType = entryTypesManager.enrich(entry.getType(), mode);
         SequencedSet<Field> fields = new LinkedHashSet<>();
         if (entryType.isPresent()) {
             for (OrFields orFields : entryType.get().getRequiredFields()) {

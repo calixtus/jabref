@@ -21,6 +21,7 @@ import javafx.scene.Node;
 import javafx.util.Pair;
 
 import org.jabref.gui.edit.automaticfiededitor.LastAutomaticFieldEditorEdit;
+import org.jabref.gui.frame.JabRefFrame;
 import org.jabref.gui.sidepane.SidePaneType;
 import org.jabref.gui.util.BackgroundTask;
 import org.jabref.gui.util.CustomLocalDragboard;
@@ -69,8 +70,8 @@ public class StateManager {
     private final EasyBinding<Double> tasksProgress = EasyBind.reduce(backgroundTasks, tasks -> tasks.map(Pair::getValue).filter(Task::isRunning).mapToDouble(Task::getProgress).average().orElse(1));
     private final ObservableMap<String, DialogWindowState> dialogWindowStates = FXCollections.observableHashMap();
     private final ObservableList<SidePaneType> visibleSidePanes = FXCollections.observableArrayList();
-
     private final ObjectProperty<LastAutomaticFieldEditorEdit> lastAutomaticFieldEditorEdit = new SimpleObjectProperty<>();
+    private final ObjectProperty<JabRefFrame.PanelMode> panelMode = new SimpleObjectProperty<>();
 
     private final ObservableList<String> searchHistory = FXCollections.observableArrayList();
 
@@ -233,6 +234,10 @@ public class StateManager {
                                   path -> list.add(path.toAbsolutePath().toString()),
                                   () -> list.add("")));
         return list;
+    }
+
+    public ObjectProperty<JabRefFrame.PanelMode> panelMode() {
+        return panelMode;
     }
 
     public void addSearchHistory(String search) {

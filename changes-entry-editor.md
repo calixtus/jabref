@@ -1,0 +1,4 @@
+- Extracted EntryEditor out of LibraryTab
+- Extracted PreviewPanel generation from Tabs
+- Added method setDatabase to PreviewViewer
+- 

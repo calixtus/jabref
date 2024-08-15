@@ -6,15 +6,15 @@ import java.util.Set;
 
 import javax.swing.undo.UndoManager;
 
+import javafx.beans.property.SimpleObjectProperty;
+
 import org.jabref.gui.DialogService;
-import org.jabref.gui.StateManager;
-import org.jabref.gui.autocompleter.SuggestionProviders;
-import org.jabref.gui.theme.ThemeManager;
+import org.jabref.gui.LibraryTab;
+import org.jabref.gui.preview.PreviewPanel;
 import org.jabref.gui.undo.RedoAction;
 import org.jabref.gui.undo.UndoAction;
 import org.jabref.gui.util.TaskExecutor;
 import org.jabref.logic.journals.JournalAbbreviationRepository;
-import org.jabref.logic.pdf.search.IndexingTaskManager;
 import org.jabref.logic.preferences.OwnerPreferences;
 import org.jabref.model.database.BibDatabaseContext;
 import org.jabref.model.database.BibDatabaseMode;
@@ -52,11 +52,11 @@ class CommentsTabTest {
     private CommentsTab commentsTab;
 
     @Mock
+    private LibraryTab libraryTab;
+    @Mock
     private BibEntryTypesManager entryTypesManager;
     @Mock
     private BibDatabaseContext databaseContext;
-    @Mock
-    private SuggestionProviders suggestionProviders;
     @Mock
     private UndoManager undoManager;
     @Mock
@@ -64,15 +64,9 @@ class CommentsTabTest {
     @Mock
     private PreferencesService preferences;
     @Mock
-    private StateManager stateManager;
-    @Mock
-    private ThemeManager themeManager;
-    @Mock
     private TaskExecutor taskExecutor;
     @Mock
     private JournalAbbreviationRepository journalAbbreviationRepository;
-    @Mock
-    private IndexingTaskManager indexingTaskManager;
     @Mock
     private OwnerPreferences ownerPreferences;
 
@@ -80,31 +74,30 @@ class CommentsTabTest {
     private EntryEditorPreferences entryEditorPreferences;
 
     @BeforeEach
-    void setUp() {
-        MockitoAnnotations.initMocks(this);
+    void setUp() throws Exception {
+        try(AutoCloseable ignored = MockitoAnnotations.openMocks(this)) {
 
-        when(preferences.getOwnerPreferences()).thenReturn(ownerPreferences);
-        when(ownerPreferences.getDefaultOwner()).thenReturn(ownerName);
-        when(preferences.getEntryEditorPreferences()).thenReturn(entryEditorPreferences);
-        when(entryEditorPreferences.shouldShowUserCommentsFields()).thenReturn(true);
-        when(databaseContext.getMode()).thenReturn(BibDatabaseMode.BIBLATEX);
-        BibEntryType entryTypeMock = mock(BibEntryType.class);
-        when(entryTypesManager.enrich(any(), any())).thenReturn(Optional.of(entryTypeMock));
+            when(libraryTab.getBibDatabaseContext()).thenReturn(databaseContext);
+            when(preferences.getOwnerPreferences()).thenReturn(ownerPreferences);
+            when(ownerPreferences.getDefaultOwner()).thenReturn(ownerName);
+            when(preferences.getEntryEditorPreferences()).thenReturn(entryEditorPreferences);
+            when(entryEditorPreferences.shouldShowUserCommentsFields()).thenReturn(true);
+            when(databaseContext.getMode()).thenReturn(BibDatabaseMode.BIBLATEX);
+            BibEntryType entryTypeMock = mock(BibEntryType.class);
+            when(entryTypesManager.enrich(any(), any())).thenReturn(Optional.of(entryTypeMock));
 
-        commentsTab = new CommentsTab(
-                preferences,
-                databaseContext,
-                suggestionProviders,
-                undoManager,
-                mock(UndoAction.class),
-                mock(RedoAction.class),
-                dialogService,
-                stateManager,
-                themeManager,
-                indexingTaskManager,
-                taskExecutor,
-                journalAbbreviationRepository
-        );
+            commentsTab = new CommentsTab(
+                    mock(PreviewPanel.class),
+                    preferences,
+                    new SimpleObjectProperty<>(libraryTab),
+                    undoManager,
+                    mock(UndoAction.class),
+                    mock(RedoAction.class),
+                    dialogService,
+                    taskExecutor,
+                    journalAbbreviationRepository
+            );
+        }
     }
 
     @Test

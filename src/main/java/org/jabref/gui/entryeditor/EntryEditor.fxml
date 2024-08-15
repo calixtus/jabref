@@ -40,7 +40,7 @@
                     <Tooltip text="%Change entry type"/>
                 </tooltip>
             </Button>
-            <Button styleClass="icon-button,narrow" onAction="#generateCiteKeyButton">
+            <Button styleClass="icon-button,narrow" onAction="#generateCitationKey">
                 <graphic>
                     <JabRefIconView glyph="MAKE_KEY"/>
                 </graphic>
@@ -48,7 +48,7 @@
                     <Tooltip text="%Generate citation key"/>
                 </tooltip>
             </Button>
-            <Button styleClass="icon-button,narrow" onAction="#generateCleanupButton">
+            <Button styleClass="icon-button,narrow" onAction="#cleanup">
                 <graphic>
                     <JabRefIconView glyph="CLEANUP_ENTRIES"/>
                 </graphic>

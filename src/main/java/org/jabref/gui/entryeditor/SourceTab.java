@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 import javax.swing.undo.UndoManager;
 
 import javafx.beans.InvalidationListener;
+import javafx.beans.binding.ObjectExpression;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.geometry.Point2D;
@@ -21,6 +22,7 @@ import javafx.scene.input.InputMethodRequests;
 import javafx.scene.input.KeyEvent;
 
 import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTab;
 import org.jabref.gui.StateManager;
 import org.jabref.gui.actions.ActionFactory;
 import org.jabref.gui.actions.SimpleCommand;
@@ -98,7 +100,7 @@ public class SourceTab extends EntryEditorTab {
         }
     }
 
-    public SourceTab(BibDatabaseContext bibDatabaseContext,
+    public SourceTab(ObjectExpression<LibraryTab> currentLibrary,
                      CountingUndoManager undoManager,
                      FieldPreferences fieldPreferences,
                      ImportFormatPreferences importFormatPreferences,
@@ -107,7 +109,9 @@ public class SourceTab extends EntryEditorTab {
                      StateManager stateManager,
                      BibEntryTypesManager entryTypesManager,
                      KeyBindingRepository keyBindingRepository) {
-        this.mode = bibDatabaseContext.getMode();
+        this.mode = currentLibrary.map(LibraryTab::getBibDatabaseContext)
+                                  .orElse(new BibDatabaseContext()).getValue()
+                                  .getMode();
         this.setText(Localization.lang("%0 source", mode.getFormattedName()));
         this.setTooltip(new Tooltip(Localization.lang("Show/edit %0 source", mode.getFormattedName())));
         this.setGraphic(IconTheme.JabRefIcons.SOURCE.getGraphicNode());

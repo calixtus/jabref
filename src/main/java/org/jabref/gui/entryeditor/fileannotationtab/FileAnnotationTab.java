@@ -1,11 +1,12 @@
 package org.jabref.gui.entryeditor.fileannotationtab;
 
+import javafx.beans.binding.ObjectExpression;
 import javafx.scene.Parent;
 import javafx.scene.control.Tooltip;
 
+import org.jabref.gui.LibraryTab;
 import org.jabref.gui.entryeditor.EntryEditorTab;
 import org.jabref.logic.l10n.Localization;
-import org.jabref.logic.pdf.FileAnnotationCache;
 import org.jabref.model.entry.BibEntry;
 import org.jabref.model.entry.field.StandardField;
 
@@ -14,10 +15,10 @@ import com.airhacks.afterburner.views.ViewLoader;
 public class FileAnnotationTab extends EntryEditorTab {
 
     public static final String NAME = "File annotations";
-    private final FileAnnotationCache fileAnnotationCache;
+    private final ObjectExpression<LibraryTab> currentLibrary;
 
-    public FileAnnotationTab(FileAnnotationCache cache) {
-        this.fileAnnotationCache = cache;
+    public FileAnnotationTab(ObjectExpression<LibraryTab> currentLibrary) {
+        this.currentLibrary = currentLibrary;
 
         setText(Localization.lang("File annotations"));
         setTooltip(new Tooltip(Localization.lang("Show file annotations")));
@@ -30,7 +31,7 @@ public class FileAnnotationTab extends EntryEditorTab {
 
     @Override
     protected void bindToEntry(BibEntry entry) {
-        Parent content = ViewLoader.view(new FileAnnotationTabView(entry, fileAnnotationCache))
+        Parent content = ViewLoader.view(new FileAnnotationTabView(entry, currentLibrary.get().getAnnotationCache()))
                                    .load()
                                    .getView();
         setContent(content);

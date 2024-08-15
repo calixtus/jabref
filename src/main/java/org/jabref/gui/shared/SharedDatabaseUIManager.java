@@ -15,7 +15,6 @@ import org.jabref.gui.DialogService;
 import org.jabref.gui.LibraryTab;
 import org.jabref.gui.LibraryTabContainer;
 import org.jabref.gui.StateManager;
-import org.jabref.gui.entryeditor.EntryEditor;
 import org.jabref.gui.exporter.SaveDatabaseAction;
 import org.jabref.gui.mergeentries.EntriesMergeResult;
 import org.jabref.gui.mergeentries.MergeEntriesDialog;
@@ -138,16 +137,18 @@ public class SharedDatabaseUIManager {
     @Subscribe
     public void listen(SharedEntriesNotPresentEvent event) {
         LibraryTab libraryTab = tabContainer.getCurrentLibraryTab();
-        EntryEditor entryEditor = libraryTab.getEntryEditor();
+        if (libraryTab == null) {
+            return;
+        }
 
         libraryTab.getUndoManager().addEdit(new UndoableRemoveEntries(libraryTab.getDatabase(), event.getBibEntries()));
+        BibEntry selectedEntry = stateManager.getSelectedEntries().getFirst();
 
-        if (entryEditor != null && (event.getBibEntries().contains(entryEditor.getCurrentlyEditedEntry()))) {
+        if (event.getBibEntries().contains(selectedEntry)) {
             dialogService.showInformationDialogAndWait(Localization.lang("Shared entry is no longer present"),
                     Localization.lang("The entry you currently work on has been deleted on the shared side.")
                             + "\n"
                             + Localization.lang("You can restore the entry using the \"Undo\" operation."));
-            libraryTab.closeBottomPane();
         }
     }
 

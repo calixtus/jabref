@@ -14,6 +14,7 @@ import javafx.scene.input.MouseButton;
 import javafx.stage.Modality;
 
 import org.jabref.gui.LibraryTab;
+import org.jabref.gui.StateManager;
 import org.jabref.gui.theme.ThemeManager;
 import org.jabref.gui.util.BaseDialog;
 import org.jabref.gui.util.ValueTableCellFactory;
@@ -35,6 +36,7 @@ public class IntegrityCheckDialog extends BaseDialog<Void> {
     @FXML private MenuButton messageFilterButton;
 
     @Inject private ThemeManager themeManager;
+    @Inject private StateManager stateManager;
 
     private final List<IntegrityMessage> messages;
     private final LibraryTab libraryTab;

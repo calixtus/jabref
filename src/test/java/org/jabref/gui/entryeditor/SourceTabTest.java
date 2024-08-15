@@ -2,6 +2,7 @@ package org.jabref.gui.entryeditor;
 
 import java.util.Collections;
 
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
@@ -10,6 +11,7 @@ import javafx.scene.control.TabPane;
 import javafx.stage.Stage;
 
 import org.jabref.gui.DialogService;
+import org.jabref.gui.LibraryTab;
 import org.jabref.gui.StateManager;
 import org.jabref.gui.keyboard.KeyBindingRepository;
 import org.jabref.gui.undo.CountingUndoManager;
@@ -48,6 +50,8 @@ class SourceTabTest {
     public void onStart(Stage stage) {
         area = new CodeArea();
         area.appendText("some example\n text to go here\n across a couple of \n lines....");
+        LibraryTab libraryTab = mock(LibraryTab.class);
+        when(libraryTab.getBibDatabaseContext()).thenReturn(new BibDatabaseContext());
         StateManager stateManager = mock(StateManager.class);
         when(stateManager.activeSearchQueryProperty()).thenReturn(OptionalObjectProperty.empty());
         when(stateManager.activeGlobalSearchQueryProperty()).thenReturn(OptionalObjectProperty.empty());
@@ -58,7 +62,7 @@ class SourceTabTest {
         when(fieldPreferences.getNonWrappableFields()).thenReturn(FXCollections.emptyObservableList());
 
         sourceTab = new SourceTab(
-                new BibDatabaseContext(),
+                new SimpleObjectProperty<>(libraryTab),
                 new CountingUndoManager(),
                 fieldPreferences,
                 importFormatPreferences,

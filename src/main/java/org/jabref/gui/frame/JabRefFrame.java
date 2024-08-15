@@ -12,8 +12,11 @@ import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.StringBinding;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.transformation.FilteredList;
 import javafx.event.Event;
+import javafx.geometry.Orientation;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
@@ -34,6 +37,7 @@ import org.jabref.gui.actions.ActionHelper;
 import org.jabref.gui.actions.SimpleCommand;
 import org.jabref.gui.actions.StandardActions;
 import org.jabref.gui.desktop.JabRefDesktop;
+import org.jabref.gui.entryeditor.EntryEditor;
 import org.jabref.gui.importer.NewEntryAction;
 import org.jabref.gui.importer.actions.OpenDatabaseAction;
 import org.jabref.gui.keyboard.KeyBinding;
@@ -44,11 +48,14 @@ import org.jabref.gui.search.SearchType;
 import org.jabref.gui.sidepane.SidePane;
 import org.jabref.gui.sidepane.SidePaneType;
 import org.jabref.gui.undo.CountingUndoManager;
+import org.jabref.gui.undo.RedoAction;
+import org.jabref.gui.undo.UndoAction;
 import org.jabref.gui.util.TaskExecutor;
 import org.jabref.logic.UiCommand;
 import org.jabref.logic.journals.JournalAbbreviationRepository;
 import org.jabref.logic.util.OS;
 import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.entry.BibEntry;
 import org.jabref.model.entry.BibEntryTypesManager;
 import org.jabref.model.entry.types.StandardEntryType;
 import org.jabref.model.util.FileUpdateMonitor;
@@ -67,19 +74,19 @@ import org.slf4j.LoggerFactory;
  * Represents the inner frame of the JabRef window
  */
 public class JabRefFrame extends BorderPane implements LibraryTabContainer, UiMessageHandler {
-
     public static final String FRAME_TITLE = "JabRef";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JabRefFrame.class);
 
-    private final SplitPane splitPane = new SplitPane();
+    public enum PanelMode { MAIN_TABLE, MAIN_TABLE_AND_ENTRY_EDITOR }
+
+    private final SplitPane horizontalSplitPane = new SplitPane();
+    private final SplitPane verticalSplitPane = new SplitPane();
     private final PreferencesService prefs;
     private final GlobalSearchBar globalSearchBar;
 
     private final FileHistoryMenu fileHistory;
     private final FrameDndHandler frameDndHandler;
-
-    @SuppressWarnings({"FieldCanBeLocal"}) private EasyObservableList<BibDatabaseContext> openDatabaseList;
 
     private final Stage mainStage;
     private final StateManager stateManager;
@@ -94,8 +101,16 @@ public class JabRefFrame extends BorderPane implements LibraryTabContainer, UiMe
     private final PushToApplicationCommand pushToApplicationCommand;
     private final SidePane sidePane;
     private final TabPane tabbedPane = new TabPane();
+    private final EntryEditor entryEditor;
 
-    private Subscription dividerSubscription;
+    private final ObjectProperty<BibEntry> currentEntry = new SimpleObjectProperty<>();
+    private final ObjectProperty<LibraryTab> currentLibrary = new SimpleObjectProperty<>();
+    private ObjectProperty<PanelMode> mode = new SimpleObjectProperty<>(PanelMode.MAIN_TABLE);
+
+    @SuppressWarnings({"FieldCanBeLocal"}) private EasyObservableList<BibDatabaseContext> openDatabaseList;
+    @SuppressWarnings({"FieldCanBeLocal"}) private Subscription verticaldividerSubscription;
+
+    private Subscription horizontaldividerSubscription;
 
     public JabRefFrame(Stage mainStage,
                        DialogService dialogService,
@@ -175,6 +190,13 @@ public class JabRefFrame extends BorderPane implements LibraryTabContainer, UiMe
             }
         });
 
+        entryEditor = new EntryEditor(
+                currentLibrary,
+                currentEntry,
+                // Actions are recreated here since this avoids passing more parameters and the amount of additional memory consumption is neglegtable.
+                new UndoAction(this::getCurrentLibraryTab, dialogService, stateManager),
+                new RedoAction(this::getCurrentLibraryTab, dialogService, stateManager));
+
         initLayout();
         initKeyBindings();
         frameDndHandler.initDragAndDrop();
@@ -215,23 +237,33 @@ public class JabRefFrame extends BorderPane implements LibraryTabContainer, UiMe
         head.setSpacing(0d);
         setTop(head);
 
-        splitPane.getItems().addAll(tabbedPane);
+        verticalSplitPane.setOrientation(Orientation.VERTICAL);
+        verticalSplitPane.getItems().addAll(tabbedPane);
+        // Saves the divider position as soon as it changes
+        // We need to keep a reference to the subscription, otherwise the binding gets garbage collected
+        verticaldividerSubscription = EasyBind.valueAt(verticalSplitPane.getDividers(), 0)
+                                              .mapObservable(SplitPane.Divider::positionProperty)
+                                              .subscribeToValues(this::saveVerticalDivider);
+
+        horizontalSplitPane.setOrientation(Orientation.HORIZONTAL);
+        horizontalSplitPane.getItems().addAll(verticalSplitPane);
         SplitPane.setResizableWithParent(sidePane, false);
         sidePane.widthProperty().addListener(c -> updateSidePane());
         sidePane.getChildren().addListener((InvalidationListener) c -> updateSidePane());
         updateSidePane();
-        setCenter(splitPane);
+
+        setCenter(horizontalSplitPane);
     }
 
     private void updateSidePane() {
         if (sidePane.getChildren().isEmpty()) {
-            if (dividerSubscription != null) {
-                dividerSubscription.unsubscribe();
+            if (horizontaldividerSubscription != null) {
+                horizontaldividerSubscription.unsubscribe();
             }
-            splitPane.getItems().remove(sidePane);
+            horizontalSplitPane.getItems().remove(sidePane);
         } else {
-            if (!splitPane.getItems().contains(sidePane)) {
-                splitPane.getItems().addFirst(sidePane);
+            if (!horizontalSplitPane.getItems().contains(sidePane)) {
+                horizontalSplitPane.getItems().addFirst(sidePane);
                 updateDividerPosition();
             }
         }
@@ -239,8 +271,60 @@ public class JabRefFrame extends BorderPane implements LibraryTabContainer, UiMe
 
     public void updateDividerPosition() {
         if (mainStage.isShowing() && !sidePane.getChildren().isEmpty()) {
-            splitPane.setDividerPositions(prefs.getGuiPreferences().getSidePaneWidth() / splitPane.getWidth());
-            dividerSubscription = EasyBind.listen(sidePane.widthProperty(), (obs, old, newVal) -> prefs.getGuiPreferences().setSidePaneWidth(newVal.doubleValue()));
+            horizontalSplitPane.setDividerPositions(prefs.getGuiPreferences().getSidePaneWidth() / horizontalSplitPane.getWidth());
+            horizontaldividerSubscription = EasyBind.listen(sidePane.widthProperty(), (obs, old, newVal) -> prefs.getGuiPreferences().setSidePaneWidth(newVal.doubleValue()));
+        }
+    }
+
+    /**
+     * Depending on whether a preview or an entry editor is showing, save the current divider location in the correct preference setting.
+     */
+    private void saveVerticalDivider(Number position) {
+        if (mode.get() == PanelMode.MAIN_TABLE_AND_ENTRY_EDITOR) {
+            prefs.getEntryEditorPreferences().setDividerPosition(position.doubleValue());
+        }
+    }
+
+    /**
+     * Sets the entry editor as the bottom component in the split pane. If an entry editor already was shown, makes sure that the divider doesn't move. Updates the mode to SHOWING_EDITOR. Then shows the given entry.
+     *
+     * @param entry The entry to edit.
+     */
+    public void showAndEdit(BibEntry entry) {
+        if (!verticalSplitPane.getItems().contains(entryEditor)) {
+            verticalSplitPane.getItems().addLast(entryEditor);
+            mode.set(PanelMode.MAIN_TABLE_AND_ENTRY_EDITOR);
+            verticalSplitPane.setDividerPositions(prefs.getEntryEditorPreferences().getDividerPosition());
+        }
+
+        currentEntry.set(entry);
+        entryEditor.requestFocus();
+    }
+
+    /**
+     * Removes the bottom component.
+     */
+    public void closeBottomPane() {
+        mode.set(PanelMode.MAIN_TABLE);
+        verticalSplitPane.getItems().remove(entryEditor);
+        getCurrentLibraryTab().requestFocus();
+    }
+
+    /**
+     * Closes the entry editor if it is showing any of the given entries.
+     */
+    private void ensureNotShowingBottomPanel(List<BibEntry> entriesToCheck) {
+        // This method is not able to close the bottom pane currently
+
+        if ((mode.get() == PanelMode.MAIN_TABLE_AND_ENTRY_EDITOR) && (entriesToCheck.contains(entryEditor.getCurrentlyEditedEntry()))) {
+            closeBottomPane();
+        }
+    }
+
+    public void updateEntryEditorIfShowing() {
+        if (mode.get() == PanelMode.MAIN_TABLE_AND_ENTRY_EDITOR) {
+            BibEntry currentEntry = entryEditor.getCurrentlyEditedEntry();
+            showAndEdit(currentEntry);
         }
     }
 
@@ -400,6 +484,7 @@ public class JabRefFrame extends BorderPane implements LibraryTabContainer, UiMe
     /**
      * Returns a list of all LibraryTabs in this frame.
      */
+    @Override
     public @NonNull List<LibraryTab> getLibraryTabs() {
         return tabbedPane.getTabs().stream()
                          .filter(LibraryTab.class::isInstance)
@@ -410,6 +495,7 @@ public class JabRefFrame extends BorderPane implements LibraryTabContainer, UiMe
     /**
      * Returns the currently viewed LibraryTab.
      */
+    @Override
     public LibraryTab getCurrentLibraryTab() {
         if (tabbedPane.getSelectionModel().getSelectedItem() == null) {
             return null;
@@ -417,6 +503,7 @@ public class JabRefFrame extends BorderPane implements LibraryTabContainer, UiMe
         return (LibraryTab) tabbedPane.getSelectionModel().getSelectedItem();
     }
 
+    @Override
     public void showLibraryTab(@NonNull LibraryTab libraryTab) {
         tabbedPane.getSelectionModel().select(libraryTab);
     }
@@ -426,6 +513,7 @@ public class JabRefFrame extends BorderPane implements LibraryTabContainer, UiMe
      * Asynchronous loading is done at {@link LibraryTab#createLibraryTab}.
      * Similar method: {@link OpenDatabaseAction#openTheFile(Path)}
      */
+    @Override
     public void addTab(@NonNull BibDatabaseContext databaseContext, boolean raisePanel) {
         Objects.requireNonNull(databaseContext);
         LibraryTab libraryTab = LibraryTab.createLibraryTab(
@@ -442,6 +530,7 @@ public class JabRefFrame extends BorderPane implements LibraryTabContainer, UiMe
         addTab(libraryTab, raisePanel);
     }
 
+    @Override
     public void addTab(@NonNull LibraryTab libraryTab, boolean raisePanel) {
         tabbedPane.getTabs().add(libraryTab);
         if (raisePanel) {
@@ -472,10 +561,12 @@ public class JabRefFrame extends BorderPane implements LibraryTabContainer, UiMe
         return viewModel.close();
     }
 
+    @Override
     public boolean closeTab(LibraryTab tab) {
         return closeTabs(List.of(tab));
     }
 
+    @Override
     public boolean closeTabs(@NonNull List<LibraryTab> tabs) {
         // Only accept library tabs that are shown in the tab container
         List<LibraryTab> toClose = tabs.stream()
@@ -520,6 +611,7 @@ public class JabRefFrame extends BorderPane implements LibraryTabContainer, UiMe
     /**
      * Refreshes the ui after preferences changes
      */
+    @Override
     public void refresh() {
         globalSearchBar.updateHintVisibility();
         getLibraryTabs().forEach(LibraryTab::setupMainPanel);

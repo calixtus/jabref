@@ -39,32 +39,24 @@ public class PreviewPanel extends VBox {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PreviewPanel.class);
 
-    private final ExternalFilesEntryLinker fileLinker;
     private final KeyBindingRepository keyBindingRepository;
     private final PreviewViewer previewView;
     private final PreviewPreferences previewPreferences;
     private final DialogService dialogService;
-    private final StateManager stateManager;
-    private final IndexingTaskManager indexingTaskManager;
     private BibEntry entry;
 
-    public PreviewPanel(BibDatabaseContext database,
-                        DialogService dialogService,
-                        KeyBindingRepository keyBindingRepository,
+    public PreviewPanel(DialogService dialogService,
                         PreferencesService preferencesService,
                         StateManager stateManager,
                         ThemeManager themeManager,
                         IndexingTaskManager indexingTaskManager,
                         TaskExecutor taskExecutor) {
-        this.keyBindingRepository = keyBindingRepository;
+        this.keyBindingRepository = preferencesService.getKeyBindingRepository();
         this.dialogService = dialogService;
-        this.stateManager = stateManager;
         this.previewPreferences = preferencesService.getPreviewPreferences();
-        this.indexingTaskManager = indexingTaskManager;
-        this.fileLinker = new ExternalFilesEntryLinker(preferencesService.getFilePreferences(), database, dialogService);
 
         PreviewPreferences previewPreferences = preferencesService.getPreviewPreferences();
-        previewView = new PreviewViewer(database, dialogService, preferencesService, stateManager, themeManager, taskExecutor);
+        previewView = new PreviewViewer(dialogService, preferencesService.getFilePreferences(), stateManager, themeManager, taskExecutor);
         previewView.setLayout(previewPreferences.getSelectedPreviewLayout());
         previewView.setContextMenu(createPopupMenu());
         previewView.setOnDragDetected(event -> {
@@ -89,6 +81,7 @@ public class PreviewPanel extends VBox {
             boolean success = false;
             if (event.getDragboard().hasContent(DataFormat.FILES)) {
                 List<Path> files = event.getDragboard().getFiles().stream().map(File::toPath).collect(Collectors.toList());
+                ExternalFilesEntryLinker fileLinker = new ExternalFilesEntryLinker(preferencesService.getFilePreferences(), stateManager.getActiveDatabase().orElse(new BibDatabaseContext()), dialogService);
 
                 if (event.getTransferMode() == TransferMode.MOVE) {
                     LOGGER.debug("Mode MOVE"); // shift on win or no modifier
@@ -158,6 +151,10 @@ public class PreviewPanel extends VBox {
         this.entry = entry;
         previewView.setEntry(entry);
         previewView.setLayout(previewPreferences.getSelectedPreviewLayout());
+    }
+
+    public void setDatabase(BibDatabaseContext database) {
+        previewView.setDatabase(database);
     }
 
     public void print() {

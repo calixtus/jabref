@@ -9,6 +9,7 @@ import javax.swing.undo.UndoManager;
 
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
+import javafx.beans.binding.ObjectExpression;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.css.PseudoClass;
@@ -39,7 +40,7 @@ import org.jabref.gui.util.TaskExecutor;
 import org.jabref.gui.util.ViewModelListCellFactory;
 import org.jabref.logic.database.DuplicateCheck;
 import org.jabref.logic.l10n.Localization;
-import org.jabref.model.database.BibDatabaseContext;
+import org.jabref.model.database.BibDatabase;
 import org.jabref.model.database.BibDatabaseModeDetection;
 import org.jabref.model.entry.BibEntry;
 import org.jabref.model.entry.BibEntryTypesManager;
@@ -67,7 +68,7 @@ public class CitationRelationsTab extends EntryEditorTab {
     private static BackgroundTask<List<BibEntry>> citingTask;
     private static BackgroundTask<List<BibEntry>> citedByTask;
     private final DialogService dialogService;
-    private final BibDatabaseContext databaseContext;
+    private final ObjectExpression<LibraryTab> currentLibrary;
     private final PreferencesService preferencesService;
     private final LibraryTab libraryTab;
     private final TaskExecutor taskExecutor;
@@ -76,7 +77,7 @@ public class CitationRelationsTab extends EntryEditorTab {
     private final DuplicateCheck duplicateCheck;
 
     public CitationRelationsTab(DialogService dialogService,
-                                BibDatabaseContext databaseContext,
+                                ObjectExpression<LibraryTab> currentLibrary,
                                 UndoManager undoManager,
                                 StateManager stateManager,
                                 FileUpdateMonitor fileUpdateMonitor,
@@ -84,7 +85,7 @@ public class CitationRelationsTab extends EntryEditorTab {
                                 LibraryTab libraryTab,
                                 TaskExecutor taskExecutor) {
         this.dialogService = dialogService;
-        this.databaseContext = databaseContext;
+        this.currentLibrary = currentLibrary;
         this.preferencesService = preferencesService;
         this.libraryTab = libraryTab;
         this.taskExecutor = taskExecutor;
@@ -94,7 +95,7 @@ public class CitationRelationsTab extends EntryEditorTab {
         this.duplicateCheck = new DuplicateCheck(new BibEntryTypesManager());
         this.bibEntryRelationsRepository = new BibEntryRelationsRepository(new SemanticScholarFetcher(preferencesService.getImporterPreferences()),
                 new BibEntryRelationsCache());
-        citationsRelationsTabViewModel = new CitationsRelationsTabViewModel(databaseContext, preferencesService, undoManager, stateManager, dialogService, fileUpdateMonitor, taskExecutor);
+        citationsRelationsTabViewModel = new CitationsRelationsTabViewModel(currentLibrary, preferencesService, undoManager, stateManager, dialogService, fileUpdateMonitor, taskExecutor);
     }
 
     /**
@@ -385,12 +386,13 @@ public class CitationRelationsTab extends EntryEditorTab {
                                              ObservableList<CitationRelationItem> observableList) {
         hideNodes(abortButton, progress);
 
+        BibDatabase currentDatabase = currentLibrary.map(LibraryTab::getDatabase).orElse(new BibDatabase()).getValue();
         observableList.setAll(
         fetchedList.stream()
             .map(entr -> duplicateCheck.containsDuplicate(
-                    databaseContext.getDatabase(),
+                    currentDatabase,
                     entr,
-                    BibDatabaseModeDetection.inferMode(databaseContext.getDatabase()))
+                    BibDatabaseModeDetection.inferMode(currentDatabase))
                 .map(localEntry -> new CitationRelationItem(entr, localEntry, true))
                 .orElseGet(() -> new CitationRelationItem(entr, false)))
             .toList()
