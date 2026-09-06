@@ -48,9 +48,6 @@ public class SharedDatabaseLoginDialogView extends BaseDialog<Void> {
     @FXML private CheckBox autosave;
     @FXML private ButtonType connectButton;
     @FXML private CheckBox useSSL;
-    @FXML private TextField fileKeystore;
-    @FXML private PasswordField passwordKeystore;
-    @FXML private Button browseKeystore;
     @FXML private TextField serverTimezone;
     @FXML private TextField jdbcUrl;
     @FXML private CheckBox expertMode;
@@ -130,16 +127,10 @@ public class SharedDatabaseLoginDialogView extends BaseDialog<Void> {
 
         useSSL.selectedProperty().bindBidirectional(viewModel.useSSLProperty());
 
-        fileKeystore.textProperty().bindBidirectional(viewModel.keyStoreProperty());
-
         expertMode.selectedProperty().bindBidirectional(viewModel.expertModeProperty());
         jdbcUrl.textProperty().bindBidirectional(viewModel.jdbcUrlProperty());
         jdbcUrl.disableProperty().bind(viewModel.expertModeProperty().not());
 
-        fileKeystore.disableProperty().bind(viewModel.useSSLProperty().not());
-        browseKeystore.disableProperty().bind(viewModel.useSSLProperty().not());
-        passwordKeystore.disableProperty().bind(viewModel.useSSLProperty().not());
-        passwordKeystore.textProperty().bindBidirectional(viewModel.keyStorePasswordProperty());
         rememberPassword.selectedProperty().bindBidirectional(viewModel.rememberPasswordProperty());
 
         // Must be executed after the initialization of the view, otherwise it doesn't work
@@ -151,19 +142,11 @@ public class SharedDatabaseLoginDialogView extends BaseDialog<Void> {
 
             EasyBind.subscribe(autosave.selectedProperty(), selected ->
                     visualizer.initVisualization(viewModel.folderValidation(), folder, true));
-
-            EasyBind.subscribe(useSSL.selectedProperty(), selected ->
-                    visualizer.initVisualization(viewModel.keystoreValidation(), fileKeystore, true));
         });
     }
 
     @FXML
     private void showSaveDbToFileDialog(ActionEvent event) {
         viewModel.showSaveDbToFileDialog();
-    }
-
-    @FXML
-    private void showOpenKeystoreFileDialog(ActionEvent event) {
-        viewModel.showOpenKeystoreFileDialog();
     }
 }
