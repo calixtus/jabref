@@ -72,9 +72,12 @@ Note that this project **does not** adhere to [Semantic Versioning](https://semv
 - We added an offer to initialize a Git repository when committing a library that is not yet version controlled. [#16722](https://github.com/JabRef/jabref/pull/16722)
 - We added OCR language selection to the OCR preferences, allowing users to configure which Tesseract languages to use. [#16618](https://github.com/JabRef/jabref/issues/16618)
 - We added a Git section to the library properties for automatic commit, pull and push. [#12630](https://github.com/JabRef/jabref/issues/12630)
+- We added connection URL pasting to the shared database login dialog. [#16800](https://github.com/JabRef/jabref/pull/16800)
 
 ### Changed
 
+- We removed the keystore fields, the server timezone, and the database type selection from the "Connect to shared database" dialog. [#16800](https://github.com/JabRef/jabref/pull/16800)
+- We changed remembered shared database passwords to use the operating system credential store. [#16800](https://github.com/JabRef/jabref/pull/16800)
 - We moved zotero-related settings from openoffice panel to openoffice/libreoffice preference tab. [#16352](https://github.com/JabRef/jabref/issues/16352)
 - We changed the default size of the "New Entry" dialog to improve visibility. [#11589](https://github.com/JabRef/jabref/issues/11589)
 - We changed the default macOS shortcuts for "Search document identifier online" and "Focus group list" to not insert special characters. [#16528](https://github.com/JabRef/jabref/issues/16528)
@@ -224,6 +227,7 @@ Note that this project **does not** adhere to [Semantic Versioning](https://semv
 - We fixed an issue where undo in one library could revert a change made in another library. [#16857](https://github.com/JabRef/jabref/pull/16857)
 - We fixed an issue where saving one library cleared the modified marker of another library. [#16857](https://github.com/JabRef/jabref/pull/16857)
 - We fixed an issue where entry added by "add entry using" was not selected. [#16035](https://github.com/JabRef/jabref/issues/16035)
+- We fixed an issue where the "Connect to shared database" dialog froze while connecting. [#16800](https://github.com/JabRef/jabref/pull/16800)
 
 ### Removed
 
